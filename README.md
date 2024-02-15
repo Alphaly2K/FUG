@@ -1,0 +1,2 @@
+# FUG
+Fxxk you, Genshin!
