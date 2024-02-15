@@ -61,7 +61,7 @@ namespace FuckUGenshin
                 }
             }
             Cookie cookie = new("SESSDATA", accountsList[0].sessdata);
-            cookieContainer.Add(new Uri(baseUrl),cookie);
+            cookieContainer.Add(new Uri(baseUrl), cookie);
             RestRequest request = new(accountInfoUrl, Method.Get)
             {
                 CookieContainer = cookieContainer
@@ -87,7 +87,7 @@ namespace FuckUGenshin
             {
                 CookieContainer = cookieContainer
             };
-            request.AddParameter("up_mid", uid);
+            _ = request.AddParameter("up_mid", uid);
             RestResponse response = Client.Execute(request);
             if (response.IsSuccessStatusCode)
             {
@@ -96,44 +96,45 @@ namespace FuckUGenshin
                     Favors favors = JsonConvert.DeserializeObject<Favors>(response.Content.ToString());
                     return favors;
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     Console.WriteLine(e);
                 }
             }
-            
+
             return null;
         }
-        
+
         //public UserInfo GetUserInfo()
         //{
         //等着优化结构，看着太垢史了
 
         //}
-        public async static Task Main(string[] args)
+        public static void Main(string[] args)
         {
-            var FUG = new FuckUGenshin();
-            var favors = FUG.GetFavorsAsync();
-            var favorslist = new List<Entities.List>();
+            FuckUGenshin FUG = new();
+            Favors? favors = FUG.GetFavorsAsync();
+            List<List> favorslist = new();
             Console.WriteLine("选择一个收藏夹吧");
-            foreach(var favor in favors.data.list)
+            foreach (List favor in favors.data.list)
             {
                 favorslist.Add(favor);
                 Console.WriteLine(favor.title);
             }
-            int option = 0;
+            int option;
             try
             {
                 option = int.Parse(Console.ReadLine());
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Console.WriteLine("让你填数字，没让你填标题[流汗]");
                 Console.WriteLine(e);
                 return;
             }
-            var select = favorslist[option - 1];
-            
+
+            _ = favorslist[option - 1];
+
         }
     }
 }
