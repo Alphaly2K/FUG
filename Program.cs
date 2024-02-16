@@ -10,6 +10,9 @@ namespace FuckUGenshin
         public static readonly string baseUrl = "https://api.bilibili.com/";
         public static readonly string accountInfoUrl = baseUrl + "x/web-interface/nav";
         public static readonly string favorsListUrl = baseUrl + "x/v3/fav/folder/created/list-all";
+        public static readonly string favorsContentUrl = baseUrl + "x/v3/fav/resource/ids";
+        public static readonly string tagUrl = baseUrl + "x/tag/archive/tags";
+        public static readonly string delUrl = baseUrl + "x/v3/fav/resource/batch-del";
         public readonly List<string> targetsList;
         public readonly List<Account> accountsList;
         public static readonly string aConfigUri = "./Configs/Accounts.json";
@@ -81,7 +84,7 @@ namespace FuckUGenshin
                 }
             }
         }
-        public Favors? GetFavorsAsync()
+        public Favors? GetFavors()
         {
             RestRequest request = new(favorsListUrl, Method.Get)
             {
@@ -105,6 +108,78 @@ namespace FuckUGenshin
             return null;
         }
 
+        public FavorsAll? GetFavorsContent(int fid)
+        {
+            RestRequest request = new(favorsContentUrl, Method.Get)
+            {
+                CookieContainer = cookieContainer
+            };
+            _ = request.AddParameter("media_id", fid);
+            RestResponse response = Client.Execute(request);
+            if (response.IsSuccessStatusCode)
+            {
+                try
+                {
+                    FavorsAll favorsContent = JsonConvert.DeserializeObject<FavorsAll>(response.Content.ToString());
+                    return favorsContent;
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                }
+            }
+            return null;
+        }
+
+        public Tags? GetTags(int aid)
+        {
+            RestRequest request = new(tagUrl, Method.Get)
+            {
+                CookieContainer = cookieContainer
+            };
+            _ = request.AddParameter("aid", aid);
+            RestResponse response = Client.Execute(request);
+            if (response.IsSuccessStatusCode)
+            {
+                try
+                {
+                    Tags tags = JsonConvert.DeserializeObject<Tags>(response.Content.ToString());
+                    return tags;
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                }
+            }
+            return null;
+        }
+
+        public bool IsGenshin(List<string> tags)
+        {
+            foreach (string target in targetsList)
+            {
+                if (tags.Exists(tag => tag == target))
+                {
+                    return true;
+                }
+            }
+            return false;
+
+        }
+
+        public bool Del(string param, int fid)
+        {
+            RestRequest request = new(delUrl, Method.Post)
+            {
+                CookieContainer = cookieContainer
+            };
+            _ = request.AddParameter("resources", param);
+            _ = request.AddParameter("media_id", fid);
+            _ = request.AddParameter("csrf", accountsList[0].csrf);
+            RestResponse response = Client.Execute(request);
+            return response.IsSuccessStatusCode;
+        }
+
         //public UserInfo GetUserInfo()
         //{
         //等着优化结构，看着太垢史了
@@ -113,9 +188,9 @@ namespace FuckUGenshin
         public static void Main(string[] args)
         {
             FuckUGenshin FUG = new();
-            Favors? favors = FUG.GetFavorsAsync();
+            Favors? favors = FUG.GetFavors();
             List<List> favorslist = new();
-            Console.WriteLine("选择一个收藏夹吧");
+            Console.WriteLine("你好" + FUG.uname + "!" + "选择一个收藏夹吧");
             foreach (List favor in favors.data.list)
             {
                 favorslist.Add(favor);
@@ -132,9 +207,34 @@ namespace FuckUGenshin
                 Console.WriteLine(e);
                 return;
             }
+            Entities.List select = favorslist[option - 1];
+            FavorsAll selectFavors = FUG.GetFavorsContent(select.id);
+            List<int> ids = new();
+            foreach (Datum video in selectFavors.data)
+            {
+                Tags tmp = FUG.GetTags(video.id);
+                List<string> tags = new();
+                foreach (TDatum tag in tmp.data)
+                {
+                    tags.Add(tag.tag_name);
+                }
+                if (FUG.IsGenshin(tags))
+                {
+                    ids.Add(video.id);
+                    Console.WriteLine("正在删除" + video.bv_id + "...");
+                }
 
-            _ = favorslist[option - 1];
-
+            }
+            string? requestParam = null;
+            foreach (int id in ids)
+            {
+                requestParam += id.ToString() + ":2,";
+            }
+            if (requestParam != null)
+            {
+                _ = requestParam.TrimEnd(',');
+                Console.WriteLine("结果" + FUG.Del(requestParam, select.id));
+            }
         }
     }
 }

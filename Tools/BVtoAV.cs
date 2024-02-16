@@ -1,4 +1,5 @@
-﻿namespace FuckUGenshin.Tools
+﻿/* 没想到他还能查询av号现在
+namespace FuckUGenshin.Tools
 {
     internal class BVtoAV
     {
@@ -61,3 +62,4 @@
         }
     }
 }
+*/
