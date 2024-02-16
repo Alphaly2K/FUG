@@ -11,61 +11,57 @@ namespace FuckUGenshin
         public static readonly string accountInfoUrl = baseUrl + "x/web-interface/nav";
         public static readonly string favorsListUrl = baseUrl + "x/v3/fav/folder/created/list-all";
         public static readonly string favorsContentUrl = baseUrl + "x/v3/fav/resource/ids";
-        public static readonly string tagUrl = baseUrl + "x/tag/archive/tags";
         public static readonly string delUrl = baseUrl + "x/v3/fav/resource/batch-del";
-        public readonly List<string> targetsList;
-        public readonly List<Account> accountsList;
-        public static readonly string aConfigUri = "./Configs/Accounts.json";
-        public static readonly string tConfigUri = "./Configs/Targets.json";
-        public readonly CookieContainer cookieContainer = new();
-        public readonly int uid;
-        public readonly string uname;
+        public static readonly string tagUrl = baseUrl + "x/tag/archive/tags";
+        public readonly string[] url = { accountInfoUrl, favorsListUrl, favorsContentUrl, tagUrl };
+        public enum GetType { Account = 0, FavorsList = 1, FavorsContent = 2, Tags = 3 };
+        private static readonly string aConfigUri = new("./Configs/Accounts.json");
+        private static readonly string tConfigUri = new("./Configs/Targets.json");
+        private readonly CookieContainer cookieContainer = new();
+        private List<Account> accountsList;
+        private List<string> targetsList;
+        private readonly RestClient Client = new();
+        private readonly string uname;
+        private readonly int uid;
         private int fid;
         private int aid;
-        public enum GetType { Account = 0, FavorsList = 1, FavorsContent = 2, Tags = 3 };
-        public readonly string[] url = { accountInfoUrl, favorsListUrl, favorsContentUrl, tagUrl };
-        public RestClient Client = new();
-        private static string? ReadConfigs(string uri)
+        private void ConfigsInit()
         {
-            if (!File.Exists(uri))
+            if (!File.Exists(aConfigUri) && !!File.Exists(tConfigUri))
             {
                 Console.WriteLine("配置文件不存在，已经创建配置文件");
-                _ = File.Create(uri);
-                return null;
+                _ = File.Create(aConfigUri);
+                _ = File.Create(tConfigUri);
+                System.Environment.Exit(-1);
             }
+            string aConfig = string.Empty;
+            string tConfig = string.Empty;
             try
             {
-                string rawConfig = File.ReadAllText(uri);
-                return rawConfig;
+                aConfig = File.ReadAllText(aConfigUri);
+                tConfig = File.ReadAllText(tConfigUri);
             }
             catch (Exception e)
             {
                 Console.WriteLine("无法打开该配置文件，请检查文件权限：");
                 Console.WriteLine(e);
             }
-            return null;
+            try
+            {
+                accountsList = JsonConvert.DeserializeObject<List<Account>>(aConfig);
+                targetsList = JsonConvert.DeserializeObject<List<string>>(tConfig);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("检查配置文件：");
+                Console.WriteLine(e);
+                System.Environment.Exit(-1);
+            }
         }
         public FuckUGenshin()
         {
             //多账号我看现在还是免了吧
-            string? rawAccounts = ReadConfigs(aConfigUri);
-            //从Tag定位，直歼原神
-            string? rawTargets = ReadConfigs(tConfigUri);
-            if (rawAccounts != null && rawTargets != null)
-            {
-                try
-                {
-                    List<Account> accounts = JsonConvert.DeserializeObject<List<Account>>(rawAccounts);
-                    List<string> targets = JsonConvert.DeserializeObject<List<string>>(rawTargets);
-                    targetsList = targets;
-                    accountsList = accounts;
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e);
-                    throw;
-                }
-            }
+            ConfigsInit();
             Cookie cookie = new("SESSDATA", accountsList[0].sessdata);
             cookieContainer.Add(new Uri(baseUrl), cookie);
             UserInfo userInfo = Get<UserInfo>(GetType.Account);
@@ -73,6 +69,7 @@ namespace FuckUGenshin
             {
                 uname = userInfo.data.uname;
                 uid = userInfo.data.mid;
+                Console.WriteLine("你好" + uname + "!" + "选择一个收藏夹吧");
                 return;
             }
             Console.WriteLine("检查配置文件中账号设置");
@@ -146,7 +143,6 @@ namespace FuckUGenshin
             FuckUGenshin FUG = new();
             Favors? favors = FUG.Get<Favors?>(GetType.FavorsList);
             List<List> favorslist = new();
-            Console.WriteLine("你好" + FUG.uname + "!" + "选择一个收藏夹吧");
             foreach (List favor in favors.data.list)
             {
                 favorslist.Add(favor);
