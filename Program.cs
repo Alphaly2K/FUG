@@ -20,6 +20,10 @@ namespace FuckUGenshin
         public readonly CookieContainer cookieContainer = new();
         public readonly int uid;
         public readonly string uname;
+        private int fid;
+        private int aid;
+        public enum GetType { Account = 0, FavorsList = 1, FavorsContent = 2, Tags = 3 };
+        public readonly string[] url = { accountInfoUrl, favorsListUrl, favorsContentUrl, tagUrl };
         public RestClient Client = new();
         private static string? ReadConfigs(string uri)
         {
@@ -58,100 +62,57 @@ namespace FuckUGenshin
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("配置文件写的都什么玩意？：");
                     Console.WriteLine(e);
                     throw;
                 }
             }
             Cookie cookie = new("SESSDATA", accountsList[0].sessdata);
             cookieContainer.Add(new Uri(baseUrl), cookie);
-            RestRequest request = new(accountInfoUrl, Method.Get)
+            UserInfo userInfo = Get<UserInfo>(GetType.Account);
+            if (userInfo != null)
             {
-                CookieContainer = cookieContainer
-            };
-            RestResponse response = Client.Execute(request);
-            if (response.IsSuccessStatusCode)
-            {
-                try
-                {
-                    UserInfo userInfo = JsonConvert.DeserializeObject<UserInfo>(response.Content.ToString());
-                    uname = userInfo.data.uname;
-                    uid = userInfo.data.mid;
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e);
-                }
+                uname = userInfo.data.uname;
+                uid = userInfo.data.mid;
+                return;
             }
-        }
-        public Favors? GetFavors()
-        {
-            RestRequest request = new(favorsListUrl, Method.Get)
-            {
-                CookieContainer = cookieContainer
-            };
-            _ = request.AddParameter("up_mid", uid);
-            RestResponse response = Client.Execute(request);
-            if (response.IsSuccessStatusCode)
-            {
-                try
-                {
-                    Favors favors = JsonConvert.DeserializeObject<Favors>(response.Content.ToString());
-                    return favors;
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e);
-                }
-            }
-
-            return null;
+            Console.WriteLine("检查配置文件中账号设置");
+            System.Environment.Exit(-1);
         }
 
-        public FavorsAll? GetFavorsContent(int fid)
+        public T? Get<T>(GetType getType)
         {
-            RestRequest request = new(favorsContentUrl, Method.Get)
+            RestRequest request = new(url[(int)getType], Method.Get)
             {
                 CookieContainer = cookieContainer
             };
-            _ = request.AddParameter("media_id", fid);
+            switch (getType)
+            {
+                case GetType.Account:
+                    break;
+                case GetType.FavorsList:
+                    _ = request.AddParameter("up_mid", uid);
+                    break;
+                case GetType.FavorsContent:
+                    _ = request.AddParameter("media_id", fid);
+                    break;
+                case GetType.Tags:
+                    _ = request.AddParameter("aid", aid);
+                    break;
+            }
             RestResponse response = Client.Execute(request);
             if (response.IsSuccessStatusCode)
             {
                 try
                 {
-                    FavorsAll favorsContent = JsonConvert.DeserializeObject<FavorsAll>(response.Content.ToString());
-                    return favorsContent;
+                    T res = JsonConvert.DeserializeObject<T>(response.Content.ToString());
+                    return res;
                 }
                 catch (Exception e)
                 {
                     Console.WriteLine(e);
                 }
             }
-            return null;
-        }
-
-        public Tags? GetTags(int aid)
-        {
-            RestRequest request = new(tagUrl, Method.Get)
-            {
-                CookieContainer = cookieContainer
-            };
-            _ = request.AddParameter("aid", aid);
-            RestResponse response = Client.Execute(request);
-            if (response.IsSuccessStatusCode)
-            {
-                try
-                {
-                    Tags tags = JsonConvert.DeserializeObject<Tags>(response.Content.ToString());
-                    return tags;
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e);
-                }
-            }
-            return null;
+            return default;
         }
 
         public bool IsGenshin(List<string> tags)
@@ -167,7 +128,7 @@ namespace FuckUGenshin
 
         }
 
-        public bool Del(string param, int fid)
+        public bool Del(string param)
         {
             RestRequest request = new(delUrl, Method.Post)
             {
@@ -180,15 +141,10 @@ namespace FuckUGenshin
             return response.IsSuccessStatusCode;
         }
 
-        //public UserInfo GetUserInfo()
-        //{
-        //等着优化结构，看着太垢史了
-
-        //}
         public static void Main(string[] args)
         {
             FuckUGenshin FUG = new();
-            Favors? favors = FUG.GetFavors();
+            Favors? favors = FUG.Get<Favors?>(GetType.FavorsList);
             List<List> favorslist = new();
             Console.WriteLine("你好" + FUG.uname + "!" + "选择一个收藏夹吧");
             foreach (List favor in favors.data.list)
@@ -208,11 +164,13 @@ namespace FuckUGenshin
                 return;
             }
             Entities.List select = favorslist[option - 1];
-            FavorsAll selectFavors = FUG.GetFavorsContent(select.id);
+            FUG.fid = select.id;
+            FavorsAll? selectFavors = FUG.Get<FavorsAll?>(GetType.FavorsContent);
             List<int> ids = new();
             foreach (Datum video in selectFavors.data)
             {
-                Tags tmp = FUG.GetTags(video.id);
+                FUG.aid = video.id;
+                Tags? tmp = FUG.Get<Tags?>(GetType.Tags);
                 List<string> tags = new();
                 foreach (TDatum tag in tmp.data)
                 {
@@ -223,7 +181,6 @@ namespace FuckUGenshin
                     ids.Add(video.id);
                     Console.WriteLine("正在删除" + video.bv_id + "...");
                 }
-
             }
             string? requestParam = null;
             foreach (int id in ids)
@@ -233,8 +190,10 @@ namespace FuckUGenshin
             if (requestParam != null)
             {
                 _ = requestParam.TrimEnd(',');
-                Console.WriteLine("结果" + FUG.Del(requestParam, select.id));
+                Console.WriteLine("结果" + FUG.Del(requestParam));
+                return;
             }
+            Console.WriteLine("恭喜你！你的收藏夹没有Genshin Impact！");
         }
     }
 }
